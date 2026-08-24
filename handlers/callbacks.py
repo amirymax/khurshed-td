@@ -89,6 +89,7 @@ async def on_admin_approve(callback: CallbackQuery, db: Database, bot: Bot, stor
                 await bot.send_message(
                     chat_id=target_user_id,
                     text=messages.format_message("step2_approved_signals", invite_link=invite_link),
+                    disable_web_page_preview=True,
                 )
             else:
                 await bot.send_message(chat_id=target_user_id, text=messages.format_message("invite_error"))
@@ -102,6 +103,7 @@ async def on_admin_approve(callback: CallbackQuery, db: Database, bot: Bot, stor
                 await bot.send_message(
                     chat_id=target_user_id,
                     text=messages.format_message("step2_approved", invite_link=invite_link),
+                    disable_web_page_preview=True,
                 )
             else:
                 await bot.send_message(chat_id=target_user_id, text=messages.format_message("invite_error"))
@@ -123,6 +125,7 @@ async def on_admin_approve(callback: CallbackQuery, db: Database, bot: Bot, stor
             await bot.send_message(
                 chat_id=target_user_id,
                 text=messages.format_message("step3_approved", invite_link=invite_link),
+                disable_web_page_preview=True,
             )
         else:
             await bot.send_message(chat_id=target_user_id, text=messages.format_message("invite_error"))

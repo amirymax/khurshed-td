@@ -51,7 +51,9 @@ async def on_bridge_pressed(message: Message, state: FSMContext, bot: Bot) -> No
         bot, user_id, config.STEP1_COVER_IMAGE, config.STEP1_COVER_VIDEO_URL, config.STEP1_COVER_SITE_URL
     )
     text = messages.format_message("step1_promo_text", site_url=config.STEP1_COVER_SITE_URL)
-    await message.answer(text, reply_markup=keyboards.get_step1_confirm_reply_keyboard())
+    await message.answer(
+        text, reply_markup=keyboards.get_step1_confirm_reply_keyboard(), disable_web_page_preview=True
+    )
     await state.set_state(UserStates.step1_ready)
 
 
