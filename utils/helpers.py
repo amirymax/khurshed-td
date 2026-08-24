@@ -67,6 +67,24 @@ def payment_amount_for(flow_type: str | None) -> int:
     return config.PAYMENT_AMOUNT_SIGNALS_USD if flow_type == "signals" else config.PAYMENT_AMOUNT_COURSE_USD
 
 
+def admin_for_step(step: int, flow_type: str | None) -> int:
+    """Which admin reviews a submission at this step, given the user's flow.
+
+    Course-flow users: ADMIN1 reviews steps 1-2, ADMIN2 reviews step 3 (opt-in эфир).
+    Signals-flow users go through steps 1-2 too, but that whole flow IS the эфир
+    signup, so ADMIN2 reviews both of their steps instead of ADMIN1.
+    """
+    if flow_type == "signals" and step in (1, 2):
+        return config.ADMIN2_ID
+    return config.STEP_ADMIN[step]
+
+
+def submissions_for_admin(submissions: list[dict], admin_id: int) -> list[dict]:
+    """Filter a list of submissions (as returned by Database.get_pending_submissions,
+    which includes each row's `flow_type`) down to the ones this admin is responsible for."""
+    return [s for s in submissions if admin_for_step(s["step"], s.get("flow_type")) == admin_id]
+
+
 def display_name(user: dict) -> str:
     username = user.get("username")
     return f"@{username}" if username else f"ID:{user['user_id']}"
@@ -168,7 +186,7 @@ async def send_submission_to_admin(
     submission_value: str,
 ) -> bool:
     """Format and send a new submission notification to the admin responsible for `step`."""
-    admin_id = config.STEP_ADMIN[step]
+    admin_id = admin_for_step(step, user.get("flow_type"))
     text = messages.format_message(
         messages.submission_notice_key(step),
         username=html.escape(user.get("username") or "нет username"),

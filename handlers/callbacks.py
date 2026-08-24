@@ -9,7 +9,7 @@ import config
 import keyboards
 import messages
 from database import Database
-from utils.helpers import create_unique_invite_link, fsm_context, payment_amount_for
+from utils.helpers import admin_for_step, create_unique_invite_link, fsm_context, payment_amount_for
 
 router = Router(name="callbacks")
 
@@ -30,8 +30,27 @@ def _is_already(callback: CallbackQuery) -> bool:
     return bool(ALREADY_RE.match(callback.data or ""))
 
 
-def _admin_allowed(user_id: int, step: int) -> bool:
-    return user_id == config.STEP_ADMIN[step]
+async def _get_submission_and_check_admin(
+    db: Database, callback: CallbackQuery, step: int, submission_id: int, require_pending: bool
+) -> tuple[dict, dict] | None:
+    """Fetch the submission (+ its user) and verify the clicking admin is the one responsible
+    for it (flow-aware: signals-flow users route steps 1-2 to ADMIN2 instead of ADMIN1).
+
+    Returns (submission, target_user), or None (and answers the callback with an error) if
+    the submission is missing/already decided, or the wrong admin clicked.
+    """
+    submission = await db.get_submission(submission_id)
+    if submission is None or (require_pending and submission["admin_decision"] != "pending"):
+        await callback.answer(messages.format_message("decision_not_found"), show_alert=True)
+        return None
+
+    target_user = await db.get_user(submission["user_id"]) or {}
+    responsible_admin = admin_for_step(step, target_user.get("flow_type"))
+    if callback.from_user.id != responsible_admin:
+        await callback.answer(messages.format_message("not_admin"), show_alert=True)
+        return None
+
+    return submission, target_user
 
 
 async def _mark_decided(callback: CallbackQuery, decision_label: str) -> None:
@@ -51,14 +70,10 @@ async def on_admin_approve(callback: CallbackQuery, db: Database, bot: Bot, stor
     submission_id = int(match["sub_id"])
     admin_id = callback.from_user.id
 
-    if not _admin_allowed(admin_id, step):
-        await callback.answer(messages.format_message("not_admin"), show_alert=True)
+    result = await _get_submission_and_check_admin(db, callback, step, submission_id, require_pending=True)
+    if result is None:
         return
-
-    submission = await db.get_submission(submission_id)
-    if submission is None or submission["admin_decision"] != "pending":
-        await callback.answer(messages.format_message("decision_not_found"), show_alert=True)
-        return
+    submission, target_user = result
 
     await db.decide_submission(submission_id, "approved", admin_id=admin_id)
     target_user_id = submission["user_id"]
@@ -74,8 +89,7 @@ async def on_admin_approve(callback: CallbackQuery, db: Database, bot: Bot, stor
         await enter_step2(bot, db, storage, target_user_id)
 
     elif step == 2:
-        target_user = await db.get_user(target_user_id)
-        is_signals = (target_user or {}).get("flow_type") == "signals"
+        is_signals = target_user.get("flow_type") == "signals"
 
         if is_signals:
             # "Сигналы" IS the эфир group — top-up approval goes straight to the эфир invite link.
@@ -140,14 +154,10 @@ async def on_admin_reject(callback: CallbackQuery, db: Database, bot: Bot, stora
     reason = match["reason"]
     admin_id = callback.from_user.id
 
-    if not _admin_allowed(admin_id, step):
-        await callback.answer(messages.format_message("not_admin"), show_alert=True)
+    result = await _get_submission_and_check_admin(db, callback, step, submission_id, require_pending=True)
+    if result is None:
         return
-
-    submission = await db.get_submission(submission_id)
-    if submission is None or submission["admin_decision"] != "pending":
-        await callback.answer(messages.format_message("decision_not_found"), show_alert=True)
-        return
+    submission, target_user = result
 
     await db.decide_submission(submission_id, "rejected", admin_id=admin_id, rejection_reason=reason)
     target_user_id = submission["user_id"]
@@ -158,8 +168,7 @@ async def on_admin_reject(callback: CallbackQuery, db: Database, bot: Bot, stora
 
     amount = None
     if step == 2:
-        target_user = await db.get_user(target_user_id)
-        amount = payment_amount_for((target_user or {}).get("flow_type"))
+        amount = payment_amount_for(target_user.get("flow_type"))
     elif step == 3:
         amount = config.PAYMENT_AMOUNT_SIGNALS_USD
     text = messages.rejection_message(step, reason, amount=amount)
@@ -180,14 +189,10 @@ async def on_admin_already(callback: CallbackQuery, db: Database, bot: Bot, stor
     submission_id = int(match["sub_id"])
     admin_id = callback.from_user.id
 
-    if not _admin_allowed(admin_id, step):
-        await callback.answer(messages.format_message("not_admin"), show_alert=True)
+    result = await _get_submission_and_check_admin(db, callback, step, submission_id, require_pending=False)
+    if result is None:
         return
-
-    submission = await db.get_submission(submission_id)
-    if submission is None:
-        await callback.answer(messages.format_message("decision_not_found"), show_alert=True)
-        return
+    submission, _target_user = result
 
     if submission["admin_decision"] == "pending":
         await db.decide_submission(

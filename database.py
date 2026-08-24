@@ -176,7 +176,7 @@ class Database:
     async def get_pending_submissions(self, steps: list[int]) -> list[dict[str, Any]]:
         placeholders = ",".join("?" for _ in steps)
         cursor = await self.conn.execute(
-            f"""SELECT s.*, u.username FROM submissions s
+            f"""SELECT s.*, u.username, u.flow_type FROM submissions s
                 JOIN users u ON u.user_id = s.user_id
                 WHERE s.admin_decision = 'pending' AND s.step IN ({placeholders})
                 ORDER BY s.submitted_at ASC""",

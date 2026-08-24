@@ -7,15 +7,18 @@ import config
 import keyboards
 from database import Database
 from utils.analytics import AnalyticsManager
-from utils.helpers import is_admin, is_admin1, is_admin2
+from utils.helpers import is_admin, is_admin1, is_admin2, submissions_for_admin
 
 router = Router(name="admin")
 
 ADMIN_QUEUE_PAGE_KEY = "admin_queue_page"
 
 
-def admin_steps(user_id: int) -> list[int]:
-    return [1, 2] if is_admin1(user_id) else [3]
+async def _pending_for_admin(db: Database, admin_id: int) -> list[dict]:
+    """All pending submissions this admin is responsible for, across every step
+    (flow-aware: a signals-flow user's steps 1-2 belong to ADMIN2, not ADMIN1)."""
+    all_pending = await db.get_pending_submissions([1, 2, 3])
+    return submissions_for_admin(all_pending, admin_id)
 
 
 @router.callback_query(F.data == "admin_menu")
@@ -23,7 +26,7 @@ async def admin_menu(callback: CallbackQuery, db: Database) -> None:
     if not is_admin(callback.from_user.id):
         await callback.answer()
         return
-    pending = await db.get_pending_submissions(admin_steps(callback.from_user.id))
+    pending = await _pending_for_admin(db, callback.from_user.id)
     await callback.message.edit_text(
         "👑 Панель администратора", reply_markup=keyboards.get_admin_main_menu(len(pending))
     )
@@ -70,7 +73,7 @@ async def admin_stats(callback: CallbackQuery, db: Database) -> None:
 
 
 async def _paginate_queue(db: Database, state: FSMContext, admin_user_id: int, page: int):
-    submissions = await db.get_pending_submissions(admin_steps(admin_user_id))
+    submissions = await _pending_for_admin(db, admin_user_id)
     page_size = config.QUEUE_PAGE_SIZE
     total_pages = max((len(submissions) + page_size - 1) // page_size, 1)
     page = max(1, min(page, total_pages))

@@ -10,14 +10,10 @@ import config
 import keyboards
 import messages
 from database import Database
-from utils.helpers import is_admin, is_admin1, resolve_media_path
+from utils.helpers import is_admin, resolve_media_path, submissions_for_admin
 
 router = Router(name="start")
 logger = logging.getLogger("trading_bot")
-
-
-def _admin_pending_steps(user_id: int) -> list[int]:
-    return [1, 2] if is_admin1(user_id) else [3]
 
 
 @router.message(CommandStart())
@@ -25,7 +21,8 @@ async def cmd_start(message: Message, command: CommandObject, db: Database) -> N
     user_id = message.from_user.id
 
     if is_admin(user_id):
-        pending = await db.get_pending_submissions(_admin_pending_steps(user_id))
+        all_pending = await db.get_pending_submissions([1, 2, 3])
+        pending = submissions_for_admin(all_pending, user_id)
         await message.answer(
             messages.format_message("start_admin"),
             reply_markup=keyboards.get_admin_main_menu(len(pending)),
