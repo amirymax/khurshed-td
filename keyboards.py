@@ -173,14 +173,15 @@ def _build_step_decision_keyboard(step: int, submission_id: int) -> InlineKeyboa
             )
         ]
     )
-    rows.append(
-        [
-            InlineKeyboardButton(
-                text=ALREADY_BUTTON_TEXT,
-                callback_data=f"admin_step{step}_already_{submission_id}",
-            )
-        ]
-    )
+    if step != 1:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=ALREADY_BUTTON_TEXT,
+                    callback_data=f"admin_step{step}_already_{submission_id}",
+                )
+            ]
+        )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

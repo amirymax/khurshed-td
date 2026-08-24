@@ -162,20 +162,12 @@ STEP1_REJECTION_BUTTONS: dict[str, dict[str, str]] = {
         "text": "🔗 Ба ссылкаи мо нест",
         "user_message": MESSAGES["other_link_rejection"],
     },
-    "not_verified": {
-        "text": "❌ Верификация нашудааст",
-        "user_message": MESSAGES["step1_not_verified"],
-    },
 }
 
 STEP2_REJECTION_BUTTONS: dict[str, dict[str, str]] = {
     "other_link": {
         "text": "🔗 Ба ссылкаи мо нест",
         "user_message": MESSAGES["other_link_rejection_step2"],
-    },
-    "not_verified": {
-        "text": "❌ Верификация нашудааст",
-        "user_message": MESSAGES["step2_not_verified"],
     },
     "not_replenished": {
         "text": "💰 Баланс пополнить нашудааст",
